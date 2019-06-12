@@ -20,6 +20,13 @@ def mimc(inp, steps, round_constants):
     print("MIMC computed in %.4f sec" % (time.time() - start_time))
     return inp
 
+def flatten_proof(S):
+    if S == []:
+        return S
+    if isinstance(S[0], list):
+        return flatten(S[0]) + flatten(S[1:])
+    return S[:1] + flatten(S[1:])
+
 # Generate a STARK for a MIMC calculation
 def mk_mimc_proof(inp, steps, round_constants):
     start_time = time.time()
@@ -144,6 +151,7 @@ def mk_mimc_proof(inp, steps, round_constants):
 # Verifies a STARK
 def verify_mimc_proof(inp, steps, round_constants, output, proof):
     m_root, l_root, main_branches, linear_comb_branches, fri_proof = proof
+    import pdb; pdb.set_trace()
     start_time = time.time()
     assert steps <= 2**32 // extension_factor
     assert is_a_power_of_2(steps) and is_a_power_of_2(len(round_constants))
@@ -204,6 +212,13 @@ def verify_mimc_proof(inp, steps, round_constants, output, proof):
                 k1 * p_of_x - k2 * p_of_x * x_to_the_steps -
                 k3 * b_of_x - k4 * b_of_x * x_to_the_steps) % modulus == 0
 
-    print('Verified %d consistency checks' % spot_check_security_factor)
-    print('Verified STARK in %.4f sec' % (time.time() - start_time))
+    # print proof 
+    y = flatten(proof)
+    import pdb; pdb.set_trace()
+
+    #print(y)
+    print("success")
+
+    # print('Verified %d consistency checks' % spot_check_security_factor)
+    # print('Verified STARK in %.4f sec' % (time.time() - start_time))
     return True
