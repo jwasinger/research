@@ -2,6 +2,19 @@ from fft import fft
 from mimc_stark import mk_mimc_proof, modulus, mimc, verify_mimc_proof
 from merkle_tree import merkelize, mk_branch, verify_branch, bin_length
 from fri import prove_low_degree, verify_low_degree_proof
+import sys, os
+
+_stderr = sys.stderr
+_stdout = sys.stdout
+
+null = open(os.devnull,'w')
+
+def disable_output():
+    sys.stdout = null
+
+def enable_output():
+    sys.stdout = _stdout
+    # sys.stderr = _stderr
 
 def test_merkletree():
     t = merkelize([x.to_bytes(32, 'big') for x in range(128)])
@@ -42,12 +55,20 @@ def test_stark():
     import random
     #constants = [random.randrange(modulus) for i in range(64)]
     constants = [(i**7) ^ 42 for i in range(64)]
+
+    disable_output()
+
+
     proof = mk_mimc_proof(INPUT, 2**LOGSTEPS, constants)
     m_root, l_root, main_branches, linear_comb_branches, fri_proof = proof
     L1 = bin_length(main_branches) + bin_length(linear_comb_branches)
     L2 = fri_proof_bin_length(fri_proof)
     print("Approx proof length: %d (branches), %d (FRI proof), %d (total)" % (L1, L2, L1 + L2))
+
+    enable_output()
+    print("foobarbazbat")
+
     assert verify_mimc_proof(3, 2**LOGSTEPS, constants, mimc(3, 2**LOGSTEPS, constants), proof)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_stark()

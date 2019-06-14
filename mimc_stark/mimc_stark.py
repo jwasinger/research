@@ -4,8 +4,10 @@ import time
 from fft import fft
 from fri import prove_low_degree, verify_low_degree_proof
 from utils import get_power_cycle, get_pseudorandom_indices, is_a_power_of_2
+import sys
 
 modulus = 2**256 - 2**32 * 351 + 1
+
 f = PrimeField(modulus)
 nonresidue = 7
 
@@ -20,12 +22,11 @@ def mimc(inp, steps, round_constants):
     print("MIMC computed in %.4f sec" % (time.time() - start_time))
     return inp
 
-def flatten_proof(S):
-    if S == []:
-        return S
-    if isinstance(S[0], list):
-        return flatten(S[0]) + flatten(S[1:])
-    return S[:1] + flatten(S[1:])
+def serialize_proof(proof):
+    sys.stdout.write(proof[0].hex())
+    sys.stdout.write(proof[1].hex())
+    sys.stdout.write("\n")
+    sys.stdout.flush()
 
 # Generate a STARK for a MIMC calculation
 def mk_mimc_proof(inp, steps, round_constants):
@@ -39,6 +40,7 @@ def mk_mimc_proof(inp, steps, round_constants):
 
     # Root of unity such that x^precision=1
     G2 = f.exp(7, (modulus-1)//precision)
+
 
     # Root of unity such that x^steps=1
     skips = precision // steps
@@ -151,7 +153,6 @@ def mk_mimc_proof(inp, steps, round_constants):
 # Verifies a STARK
 def verify_mimc_proof(inp, steps, round_constants, output, proof):
     m_root, l_root, main_branches, linear_comb_branches, fri_proof = proof
-    import pdb; pdb.set_trace()
     start_time = time.time()
     assert steps <= 2**32 // extension_factor
     assert is_a_power_of_2(steps) and is_a_power_of_2(len(round_constants))
@@ -163,12 +164,22 @@ def verify_mimc_proof(inp, steps, round_constants, output, proof):
     G2 = f.exp(7, (modulus-1)//precision)
     skips = precision // steps
 
+    print("G2 is ", G2)
+    print("extension factor is ", extension_factor)
+    print("skips is ", skips)
+
+
     # Gets the polynomial representing the round constants
     skips2 = steps // len(round_constants)
-    constants_mini_polynomial = fft(round_constants, modulus, f.exp(G2, extension_factor * skips2), inv=True)
+
+    v = f.exp(G2, extension_factor * skips2)
+    print("constants mini polynomial root is ", v)
+
+    constants_mini_polynomial = fft(round_constants, modulus, v, inv=True)
 
     # Verifies the low-degree proofs
     assert verify_low_degree_proof(l_root, G2, fri_proof, steps * 2, modulus, exclude_multiples_of=extension_factor)
+
 
     # Performs the spot checks
     k1 = int.from_bytes(blake(m_root + b'\x01'), 'big')
@@ -212,11 +223,8 @@ def verify_mimc_proof(inp, steps, round_constants, output, proof):
                 k1 * p_of_x - k2 * p_of_x * x_to_the_steps -
                 k3 * b_of_x - k4 * b_of_x * x_to_the_steps) % modulus == 0
 
-    # print proof 
-    y = flatten(proof)
-    import pdb; pdb.set_trace()
+    serialize_proof(proof)
 
-    #print(y)
     print("success")
 
     # print('Verified %d consistency checks' % spot_check_security_factor)
