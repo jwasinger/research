@@ -22,11 +22,21 @@ def mimc(inp, steps, round_constants):
     print("MIMC computed in %.4f sec" % (time.time() - start_time))
     return inp
 
+def serialize_merkle_branches(branches):
+    res = b''
+
+    for branch in branches:
+        b = list(filter(lambda x: x != b'', branch))
+        res += bytes([len(b)]).ljust(16, bytes([0]))
+        res += b''.join(b)
+
+    return res
+
 def serialize_proof(proof):
-    sys.stdout.write(proof[0].hex())
-    sys.stdout.write(proof[1].hex())
-    sys.stdout.write("\n")
-    sys.stdout.flush()
+    res = proof[0]
+    res += proof[1]
+    res += serialize_merkle_branches(proof[2])
+    return res
 
 # Generate a STARK for a MIMC calculation
 def mk_mimc_proof(inp, steps, round_constants):
@@ -164,18 +174,14 @@ def verify_mimc_proof(inp, steps, round_constants, output, proof):
     G2 = f.exp(7, (modulus-1)//precision)
     skips = precision // steps
 
-    print("G2 is ", G2)
-    print("extension factor is ", extension_factor)
-    print("skips is ", skips)
-
 
     # Gets the polynomial representing the round constants
     skips2 = steps // len(round_constants)
 
     v = f.exp(G2, extension_factor * skips2)
-    print("constants mini polynomial root is ", v)
 
     constants_mini_polynomial = fft(round_constants, modulus, v, inv=True)
+    print("constants mini polynomial is ", constants_mini_polynomial)
 
     # Verifies the low-degree proofs
     assert verify_low_degree_proof(l_root, G2, fri_proof, steps * 2, modulus, exclude_multiples_of=extension_factor)
@@ -222,10 +228,6 @@ def verify_mimc_proof(inp, steps, round_constants, output, proof):
         assert (l_of_x - d_of_x - 
                 k1 * p_of_x - k2 * p_of_x * x_to_the_steps -
                 k3 * b_of_x - k4 * b_of_x * x_to_the_steps) % modulus == 0
-
-    serialize_proof(proof)
-
-    print("success")
 
     # print('Verified %d consistency checks' % spot_check_security_factor)
     # print('Verified STARK in %.4f sec' % (time.time() - start_time))

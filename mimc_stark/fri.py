@@ -66,11 +66,15 @@ def verify_low_degree_proof(merkle_root, root_of_unity, proof, maxdeg_plus_1, mo
         roudeg *= 2
         testval = (testval * testval) % modulus
 
+    print("roudeg is ", roudeg)
+
     # Powers of the given root of unity 1, p, p**2, p**3 such that p**4 = 1
     quartic_roots_of_unity = [1,
                               f.exp(root_of_unity, roudeg // 4),
                               f.exp(root_of_unity, roudeg // 2),
                               f.exp(root_of_unity, roudeg * 3 // 4)]
+
+    print("quartic roots of unity are ", quartic_roots_of_unity)
 
     # Verify the recursive components of the proof
     for prf in proof[:-1]:

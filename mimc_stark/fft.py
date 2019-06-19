@@ -14,11 +14,20 @@ def _fft(vals, modulus, roots_of_unity):
         return _simple_ft(vals, modulus, roots_of_unity)
     L = _fft(vals[::2], modulus, roots_of_unity[::2])
     R = _fft(vals[1::2], modulus, roots_of_unity[::2])
+    # print("L is ", L)
+    # print("R is ", R)
+
     o = [0 for i in vals]
     for i, (x, y) in enumerate(zip(L, R)):
         y_times_root = y*roots_of_unity[i]
         o[i] = (x+y_times_root) % modulus 
+        # print("o[i] = ", o[i])
         o[i+len(L)] = (x-y_times_root) % modulus 
+        # print("o[i+Len(L)] = ", o[i+len(L)])
+        # print("modulus = ", modulus)
+        # print("x-y_times_root ", x-y_times_root)
+        # print("(x-y_times_root) % modulus", (x-y_times_root) % modulus)
+
     return o
 
 def fft(vals, modulus, root_of_unity, inv=False):
@@ -31,9 +40,14 @@ def fft(vals, modulus, root_of_unity, inv=False):
         vals = vals + [0] * (len(rootz) - len(vals) - 1)
     if inv:
         # Inverse FFT
+        # println("len vals ", len(vals))
+        # println("modulus ", modulus)
         invlen = pow(len(vals), modulus-2, modulus)
-        return [(x*invlen) % modulus for x in
-                _fft(vals, modulus, rootz[:0:-1])]
+        # print("invlen is ", invlen)
+        fft_res = _fft(vals, modulus, rootz[:0:-1])
+        res = [(x*invlen) % modulus for x in fft_res]
+        print("final result is ", res)
+        return res
     else:
         # Regular FFT
         return _fft(vals, modulus, rootz[:-1])

@@ -9,6 +9,7 @@ def merkelize(L):
     nodes = [b''] * len(L) + [x.to_bytes(32, 'big') if isinstance(x, int) else x for x in L]
     for i in range(len(L) - 1, 0, -1):
         nodes[i] = blake(nodes[i*2] + nodes[i*2+1])
+
     return nodes
 
 def mk_branch(tree, index):
@@ -47,6 +48,7 @@ def mk_multi_branch(tree, indices):
             calculable_indices[index ^ 1] = True
             index //= 2
         output.append(new_branch)
+
     # Fill in the calculable list: if we can get or calculate both children, we can calculate the parent
     complete = False
     while not complete:
@@ -82,6 +84,8 @@ def verify_multi_branch(root, indices, proof):
             if b[j]:
                 partial_tree[index ^ 1] = b[j]
             index //= 2
+
+
     # If we can calculate or get both children, we can calculate the parent
     complete = False
     while not complete:
