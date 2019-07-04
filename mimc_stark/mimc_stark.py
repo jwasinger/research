@@ -5,6 +5,7 @@ from fft import fft
 from fri import prove_low_degree, verify_low_degree_proof
 from utils import get_power_cycle, get_pseudorandom_indices, is_a_power_of_2
 import sys
+import binascii
 
 modulus = 2**256 - 2**32 * 351 + 1
 
@@ -14,6 +15,9 @@ nonresidue = 7
 spot_check_security_factor = 80
 extension_factor = 8
 
+TYPE_POINTS = 1
+TYPE_PROOF =  2
+
 # Compute a MIMC permutation for some number of steps
 def mimc(inp, steps, round_constants):
     start_time = time.time()
@@ -22,20 +26,59 @@ def mimc(inp, steps, round_constants):
     print("MIMC computed in %.4f sec" % (time.time() - start_time))
     return inp
 
-def serialize_merkle_branches(branches):
+def serialize_merkle(branches):
+    res = b''
+    res += bytearray.fromhex(hex(len(branches))[2:].zfill(4))
+    for i, b in enumerate(branches):
+        for witness in b:
+            res += witness
+
+    return res
+
+def serialize_points(points):
     res = b''
 
-    for branch in branches:
-        b = list(filter(lambda x: x != b'', branch))
-        res += bytes([len(b)]).ljust(16, bytes([0]))
-        res += b''.join(b)
+    for p in points:
+        res += p
+
+    res = bytearray.fromhex(hex(len(points))[2:].zfill(4)) + res
+    return res
+
+def serialize_fri_proof(proof, maxdeg_plus_1):
+    res = b''
+
+    # data points are all 32 byte
+    for i, data in enumerate(proof):
+        if maxdeg_plus_1 < 16:
+            res += bytearray.fromhex(hex(TYPE_POINTS)[2:].zfill(4))
+            import pdb; pdb.set_trace()
+            res += serialize_points(data)
+        else:
+            res += bytearray.fromhex(hex(TYPE_PROOF)[2:].zfill(4))
+            # add the merkle root?
+            res += data[0]
+
+            # two bytes for length of the witnesses
+            size_c = bytearray.fromhex(hex(len(data[1]))[2:].zfill(4))
+            res += size_c
+
+            res += serialize_merkle(data[1])
+
+        maxdeg_plus_1 //= 4
+
+# TODO exception line below
+        try:
+            res += serialize_merkle(data[1])
+        except Exception as e:
+            import pdb; pdb.set_trace()
+        print(len(res))
 
     return res
 
 def serialize_proof(proof):
     res = proof[0]
     res += proof[1]
-    res += serialize_merkle_branches(proof[2])
+    res += serialize_fri_proof(proof[-1], 4096)
     return res
 
 # Generate a STARK for a MIMC calculation
@@ -199,6 +242,10 @@ def verify_mimc_proof(inp, steps, round_constants, output, proof):
     last_step_position = f.exp(G2, (steps - 1) * skips)
     main_branch_leaves = verify_multi_branch(m_root, augmented_positions, main_branches)
     linear_comb_branch_leaves = verify_multi_branch(l_root, positions, linear_comb_branches)
+
+    print("main branch leaves ", main_branch_leaves)
+    print("linear combination branch leaves ", linear_comb_branch_leaves)
+
     for i, pos in enumerate(positions):
         x = f.exp(G2, pos)
         x_to_the_steps = f.exp(x, steps)

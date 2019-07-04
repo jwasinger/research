@@ -56,7 +56,7 @@ def test_stark():
     #constants = [random.randrange(modulus) for i in range(64)]
     constants = [(i**7) ^ 42 for i in range(64)]
 
-    disable_output()
+    # disable_output()
 
 
     proof = mk_mimc_proof(INPUT, 2**LOGSTEPS, constants)
@@ -65,13 +65,9 @@ def test_stark():
     L2 = fri_proof_bin_length(fri_proof)
     print("Approx proof length: %d (branches), %d (FRI proof), %d (total)" % (L1, L2, L1 + L2))
 
-
-    enable_output()
-    # print("foobarbazbat")
-
     assert verify_mimc_proof(3, 2**LOGSTEPS, constants, mimc(3, 2**LOGSTEPS, constants), proof)
     with open('proof', 'wb') as f:
-      f.write(serialize_proof(proof))
+        f.write(serialize_proof(proof))
 
 if __name__ == "__main__":
     test_stark()

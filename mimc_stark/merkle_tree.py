@@ -48,27 +48,6 @@ def mk_multi_branch(tree, indices):
             calculable_indices[index ^ 1] = True
             index //= 2
         output.append(new_branch)
-
-    # Fill in the calculable list: if we can get or calculate both children, we can calculate the parent
-    complete = False
-    while not complete:
-        complete = True
-        keys = sorted([x//2 for x in calculable_indices])[::-1]
-        for k in keys:
-            if k*2 in calculable_indices and (k*2)+1 in calculable_indices and k not in calculable_indices:
-                calculable_indices[k] = True
-                complete = False
-    # If for any branch node both children are calculable, or the node overlaps with a leaf, or the node
-    # overlaps with a previously calculated one, elide it
-    scanned = {}
-    for i, b in zip(indices, output):
-        index = len(tree) // 2 + i
-        scanned[index] = True
-        for j in range(1, len(b)):
-            if ((index^1)*2 in calculable_indices and (index^1)*2+1 in calculable_indices) or ((index^1)-len(tree)//2 in indices) or (index^1) in scanned:
-                b[j] = b''
-            scanned[index^1] = True
-            index //= 2
     return output
 
 # Verify a compressed proof
@@ -83,25 +62,6 @@ def verify_multi_branch(root, indices, proof):
         for j in range(1, len(b)):
             if b[j]:
                 partial_tree[index ^ 1] = b[j]
-            index //= 2
-
-
-    # If we can calculate or get both children, we can calculate the parent
-    complete = False
-    while not complete:
-        complete = True
-        keys = sorted([x//2 for x in partial_tree])[::-1]
-        for k in keys:
-            if k*2 in partial_tree and k*2+1 in partial_tree and k not in partial_tree:
-                partial_tree[k] = blake(partial_tree[k*2] + partial_tree[k*2+1])
-                complete = False
-    # If any branch node is missing, we can calculate it
-    for i, b in zip(indices, proof):
-        index = half_tree_size + i
-        for j in range(1, len(b)):
-            if b[j] == b'':
-                b[j] = partial_tree[index ^ 1]
-            partial_tree[index^1] = b[j]
             index //= 2
     # Verify the branches and output the values
     return [verify_branch(root, i, b) for i,b in zip(indices, proof)]

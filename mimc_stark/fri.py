@@ -1,6 +1,9 @@
 from permuted_tree import merkelize, mk_branch, verify_branch, mk_multi_branch, verify_multi_branch
 from utils import get_power_cycle, get_pseudorandom_indices
 from poly_utils import PrimeField
+from mock_accumulator import lookup_column_value, lookup_poly_value
+import pprint
+import binascii
 
 # Generate an FRI proof that the polynomial that has the specified
 # values at successive powers of the specified root of unity has a
@@ -76,6 +79,12 @@ def verify_low_degree_proof(merkle_root, root_of_unity, proof, maxdeg_plus_1, mo
 
     print("quartic roots of unity are ", quartic_roots_of_unity)
 
+    z = 0
+
+    column_map = []
+    poly_map = []
+
+
     # Verify the recursive components of the proof
     for prf in proof[:-1]:
         root2, column_branches, poly_branches = prf
@@ -88,12 +97,39 @@ def verify_low_degree_proof(merkle_root, root_of_unity, proof, maxdeg_plus_1, mo
         ys = get_pseudorandom_indices(root2, roudeg // 4, 40,
                                       exclude_multiples_of=exclude_multiples_of)
 
+        # import pdb; pdb.set_trace()
+
         # Compute the positions for the values in the polynomial
         poly_positions = sum([[y + (roudeg // 4) * j for j in range(4)] for y in ys], [])
 
         # Verify Merkle branches
         column_values = verify_multi_branch(root2, ys, column_branches)
         poly_values = verify_multi_branch(merkle_root, poly_positions, poly_branches)
+
+        column_value_map = {}
+        poly_value_map = {}
+
+        # column_values = [lookup_column_value(y, z) for y in ys]
+        # poly_values = [lookup_poly_value(p, z) for p in poly_positions]
+
+        # import pdb; pdb.set_trace()
+
+        for i in range(0,len(ys)):
+            # assert(column_values[i] == bytes.fromhex(column_values[i].hex()))
+            if ys[i] in column_value_map:
+                print("replacing ", column_value_map[ys[i]], " with ", ys[i])
+
+            column_value_map[ys[i]] = column_values[i].hex()
+
+        for i in range(0,len(poly_positions)):
+            if poly_positions[i] in poly_value_map:
+                print("replacing ", poly_value_map[poly_positions[i]], " with ", poly_positions[i])
+
+            poly_value_map[poly_positions[i]] = poly_values[i].hex()
+
+        column_map.append(column_value_map)
+        poly_map.append(poly_value_map)
+
 
         # For each y coordinate, get the x coordinates on the row, the values on
         # the row, and the value at that y from the column
@@ -124,6 +160,26 @@ def verify_low_degree_proof(merkle_root, root_of_unity, proof, maxdeg_plus_1, mo
         root_of_unity = f.exp(root_of_unity, 4)
         maxdeg_plus_1 //= 4
         roudeg //= 4
+
+        z += 1
+
+    # import pdb; pdb.set_trace()
+    # pp = pprint.PrettyPrinter(indent=4)
+    print("poly values are:")
+    # print(pp.pprint(poly_map))
+    # print("column values are:")
+    # print(pp.pprint(column_map))
+
+    for i, m in enumerate(poly_map):
+        print("res["+str(i)+"] = HashMap::new();")
+        for item in m.keys():
+            print("res["+str(i)+"].insert("+str(item)+", BigUint::from_bytes_be(&hex::decode(\""+m[item]+"\").unwrap()));")
+
+    print("column values are:")
+    for i, m in enumerate(column_map):
+        print("res["+str(i)+"] = HashMap::new();")
+        for item in m.keys():
+            print("res["+str(i)+"].insert("+str(item)+", BigUint::from_bytes_be(&hex::decode(\""+m[item]+"\").unwrap()));")
 
     # Verify the direct components of the proof
     data = [int.from_bytes(x, 'big') for x in proof[-1]]
