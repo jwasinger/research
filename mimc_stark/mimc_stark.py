@@ -15,8 +15,8 @@ nonresidue = 7
 spot_check_security_factor = 80
 extension_factor = 8
 
-TYPE_POINTS = 1
-TYPE_PROOF =  2
+TYPE_PROOF =  1
+TYPE_POINTS = 2
 
 # Compute a MIMC permutation for some number of steps
 def mimc(inp, steps, round_constants):
@@ -28,20 +28,38 @@ def mimc(inp, steps, round_constants):
 
 def serialize_merkle(branches):
     res = b''
-    res += bytearray.fromhex(hex(len(branches))[2:].zfill(4))
+
+    res += (len(branches)).to_bytes(4, 'little')
+
     for i, b in enumerate(branches):
-        for witness in b:
+      # pack leaf value (4 bytes), length of witnesses (4 bytes) and witnesses
+        try:
+            value = b[0]
+        except Exception as e:
+            import pdb; pdb.set_trace()
+
+        res += value
+        print("value is ", binascii.hexlify(value))
+        witnesses_size = ((len(b)-1)*32).to_bytes(4, 'little')
+        print("witnesses size is ", binascii.hexlify(witnesses_size))
+        res += witnesses_size
+        for witness in b[1:]:
             res += witness
 
+    print()
+    print("merkle serialization successful")
+    print()
     return res
 
 def serialize_points(points):
     res = b''
 
+    res += (len(points)*32).to_bytes(4, 'little')
+
     for p in points:
+        assert(len(p) == 32)
         res += p
 
-    res = bytearray.fromhex(hex(len(points))[2:].zfill(4)) + res
     return res
 
 def serialize_fri_proof(proof, maxdeg_plus_1):
@@ -50,34 +68,36 @@ def serialize_fri_proof(proof, maxdeg_plus_1):
     # data points are all 32 byte
     for i, data in enumerate(proof):
         if maxdeg_plus_1 < 16:
-            res += bytearray.fromhex(hex(TYPE_POINTS)[2:].zfill(4))
-            import pdb; pdb.set_trace()
+            res += TYPE_POINTS.to_bytes(4, 'little')
             res += serialize_points(data)
+            import pdb; pdb.set_trace()
         else:
-            res += bytearray.fromhex(hex(TYPE_PROOF)[2:].zfill(4))
+            res += TYPE_PROOF.to_bytes(4, 'little')# bytearray.fromhex(hex(TYPE_PROOF)[2:].zfill(8))
             # add the merkle root?
-            res += data[0]
+
 
             # two bytes for length of the witnesses
-            size_c = bytearray.fromhex(hex(len(data[1]))[2:].zfill(4))
-            res += size_c
+            # size_c = bytearray.fromhex(hex(len(data[1]))[2:].zfill(8))
+            # res += len(data[1]).to_bytes(4, 'little')
+            # res += size_c
 
-            res += serialize_merkle(data[1])
+            res += data[0] # merkle root 
+            res += serialize_merkle(data[1]) # column merkle tree 
+            res += serialize_merkle(data[2]) # poly merkle tree
 
         maxdeg_plus_1 //= 4
 
-# TODO exception line below
-        try:
-            res += serialize_merkle(data[1])
-        except Exception as e:
-            import pdb; pdb.set_trace()
         print(len(res))
 
     return res
 
 def serialize_proof(proof):
-    res = proof[0]
-    res += proof[1]
+    res = proof[0] # append merkle root
+    res += proof[1] # append l_merkle root
+
+    print("proof part 1 is", binascii.hexlify(proof[0]))
+    print("proof part 2 is", binascii.hexlify(proof[1]))
+
     res += serialize_fri_proof(proof[-1], 4096)
     return res
 
