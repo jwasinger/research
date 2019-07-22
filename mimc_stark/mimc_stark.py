@@ -33,22 +33,30 @@ def serialize_merkle(branches):
 
     for i, b in enumerate(branches):
       # pack leaf value (4 bytes), length of witnesses (4 bytes) and witnesses
-        try:
-            value = b[0]
-        except Exception as e:
-            import pdb; pdb.set_trace()
+        value_size = (len(b[0])).to_bytes(4, 'little')
+        value = b[0]
+        sibling_value = b[1]
 
+        res += value_size
         res += value
+        res += sibling_value
+
+        print("value size is ", binascii.hexlify(value_size))
+        
         print("value is ", binascii.hexlify(value))
-        witnesses_size = ((len(b)-1)*32).to_bytes(4, 'little')
-        print("witnesses size is ", binascii.hexlify(witnesses_size))
+        witnesses_size = ((len(b)-2)*32).to_bytes(4, 'little')
+        # print("witnesses size is ", binascii.hexlify(witnesses_size))
+        # print("witnesses size is ", len(b))
         res += witnesses_size
-        for witness in b[1:]:
+        for witness in b[2:]:
+            print("witness is ", binascii.hexlify(witness))
             res += witness
 
     print()
     print("merkle serialization successful")
     print()
+
+    # import pdb; pdb.set_trace()
     return res
 
 def serialize_points(points):
@@ -70,7 +78,6 @@ def serialize_fri_proof(proof, maxdeg_plus_1):
         if maxdeg_plus_1 < 16:
             res += TYPE_POINTS.to_bytes(4, 'little')
             res += serialize_points(data)
-            import pdb; pdb.set_trace()
         else:
             res += TYPE_PROOF.to_bytes(4, 'little')# bytearray.fromhex(hex(TYPE_PROOF)[2:].zfill(8))
             # add the merkle root?
@@ -99,6 +106,8 @@ def serialize_proof(proof):
     print("proof part 2 is", binascii.hexlify(proof[1]))
 
     res += serialize_fri_proof(proof[-1], 4096)
+    res += serialize_merkle(proof[2])
+    res += serialize_merkle(proof[3])
     return res
 
 # Generate a STARK for a MIMC calculation
@@ -171,10 +180,11 @@ def mk_mimc_proof(inp, steps, round_constants):
     print('Computed B polynomial')
 
     # Compute their Merkle root
-    mtree = merkelize([pval.to_bytes(32, 'big') +
+    valz = [pval.to_bytes(32, 'big') +
                        dval.to_bytes(32, 'big') +
                        bval.to_bytes(32, 'big') for
-                       pval, dval, bval in zip(p_evaluations, d_evaluations, b_evaluations)])
+                       pval, dval, bval in zip(p_evaluations, d_evaluations, b_evaluations)]
+    mtree = merkelize(valz)
     print('Computed hash root')
 
     # Based on the hashes of P, D and B, we select a random linear combination
@@ -213,11 +223,13 @@ def mk_mimc_proof(inp, steps, round_constants):
     #    branches.append(mk_branch(l_mtree, pos))
     print('Computed %d spot checks' % samples)
 
+    # import pdb; pdb.set_trace()
+    xyz = mk_multi_branch(mtree, augmented_positions)
     # Return the Merkle roots of P and D, the spot check Merkle proofs,
     # and low-degree proofs of P and D
     o = [mtree[1],
          l_mtree[1],
-         mk_multi_branch(mtree, augmented_positions),
+         xyz,
          mk_multi_branch(l_mtree, positions),
          prove_low_degree(l_evaluations, G2, steps * 2, modulus, exclude_multiples_of=extension_factor)]
     print("STARK computed in %.4f sec" % (time.time() - start_time))
@@ -226,6 +238,7 @@ def mk_mimc_proof(inp, steps, round_constants):
 # Verifies a STARK
 def verify_mimc_proof(inp, steps, round_constants, output, proof):
     m_root, l_root, main_branches, linear_comb_branches, fri_proof = proof
+    # import pdb; pdb.set_trace()
     start_time = time.time()
     assert steps <= 2**32 // extension_factor
     assert is_a_power_of_2(steps) and is_a_power_of_2(len(round_constants))
@@ -246,9 +259,9 @@ def verify_mimc_proof(inp, steps, round_constants, output, proof):
     constants_mini_polynomial = fft(round_constants, modulus, v, inv=True)
     print("constants mini polynomial is ", constants_mini_polynomial)
 
+    print("lroot is ", binascii.hexlify(l_root))
     # Verifies the low-degree proofs
     assert verify_low_degree_proof(l_root, G2, fri_proof, steps * 2, modulus, exclude_multiples_of=extension_factor)
-
 
     # Performs the spot checks
     k1 = int.from_bytes(blake(m_root + b'\x01'), 'big')
@@ -258,8 +271,12 @@ def verify_mimc_proof(inp, steps, round_constants, output, proof):
     samples = spot_check_security_factor
     positions = get_pseudorandom_indices(l_root, precision, samples,
                                          exclude_multiples_of=extension_factor)
+
     augmented_positions = sum([[x, (x + skips) % precision] for x in positions], [])
     last_step_position = f.exp(G2, (steps - 1) * skips)
+
+    # import pdb; pdb.set_trace()
+    print("augmented positions len", str(len(augmented_positions)))
     main_branch_leaves = verify_multi_branch(m_root, augmented_positions, main_branches)
     linear_comb_branch_leaves = verify_multi_branch(l_root, positions, linear_comb_branches)
 

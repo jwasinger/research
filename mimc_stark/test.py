@@ -65,6 +65,8 @@ def test_stark():
     L2 = fri_proof_bin_length(fri_proof)
     print("Approx proof length: %d (branches), %d (FRI proof), %d (total)" % (L1, L2, L1 + L2))
 
+    # enable_output()
+
     assert verify_mimc_proof(3, 2**LOGSTEPS, constants, mimc(3, 2**LOGSTEPS, constants), proof)
     with open('proof', 'wb') as f:
         f.write(serialize_proof(proof))

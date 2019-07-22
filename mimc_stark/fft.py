@@ -46,7 +46,7 @@ def fft(vals, modulus, root_of_unity, inv=False):
         # print("invlen is ", invlen)
         fft_res = _fft(vals, modulus, rootz[:0:-1])
         res = [(x*invlen) % modulus for x in fft_res]
-        print("final result is ", res)
+        # print("final result is ", res)
         return res
     else:
         # Regular FFT

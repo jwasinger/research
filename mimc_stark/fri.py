@@ -1,7 +1,6 @@
 from permuted_tree import merkelize, mk_branch, verify_branch, mk_multi_branch, verify_multi_branch
 from utils import get_power_cycle, get_pseudorandom_indices
 from poly_utils import PrimeField
-from mock_accumulator import lookup_column_value, lookup_poly_value
 import pprint
 import binascii
 
@@ -45,11 +44,17 @@ def prove_low_degree(values, root_of_unity, maxdeg_plus_1, modulus, exclude_mult
     column = [f.eval_quartic(p, special_x) for p in x_polys]
     m2 = merkelize(column)
 
+    print("root2 is ", binascii.hexlify(m2[1]).decode())
     # Pseudo-randomly select y indices to sample
     ys = get_pseudorandom_indices(m2[1], len(column), 40, exclude_multiples_of=exclude_multiples_of)
 
+    print("ys")
+    for y in ys:
+        print(y)
+
     # Compute the positions for the values in the polynomial
     poly_positions = sum([[y + (len(xs) // 4) * j for j in range(4)] for y in ys], [])
+
 
     # This component of the proof, including Merkle branches
     o = [m2[1], mk_multi_branch(m2, ys), mk_multi_branch(m, poly_positions)]
@@ -97,13 +102,15 @@ def verify_low_degree_proof(merkle_root, root_of_unity, proof, maxdeg_plus_1, mo
         ys = get_pseudorandom_indices(root2, roudeg // 4, 40,
                                       exclude_multiples_of=exclude_multiples_of)
 
-        # import pdb; pdb.set_trace()
+        print("root2 is ", binascii.hexlify(root2))
 
         # Compute the positions for the values in the polynomial
         poly_positions = sum([[y + (roudeg // 4) * j for j in range(4)] for y in ys], [])
 
         # Verify Merkle branches
         column_values = verify_multi_branch(root2, ys, column_branches)
+        print("merkle root is " + binascii.hexlify(merkle_root).decode())
+        print("verifying poly values")
         poly_values = verify_multi_branch(merkle_root, poly_positions, poly_branches)
 
         column_value_map = {}
@@ -112,7 +119,6 @@ def verify_low_degree_proof(merkle_root, root_of_unity, proof, maxdeg_plus_1, mo
         # column_values = [lookup_column_value(y, z) for y in ys]
         # poly_values = [lookup_poly_value(p, z) for p in poly_positions]
 
-        # import pdb; pdb.set_trace()
 
         for i in range(0,len(ys)):
             # assert(column_values[i] == bytes.fromhex(column_values[i].hex()))
@@ -130,7 +136,6 @@ def verify_low_degree_proof(merkle_root, root_of_unity, proof, maxdeg_plus_1, mo
         column_map.append(column_value_map)
         poly_map.append(poly_value_map)
 
-
         # For each y coordinate, get the x coordinates on the row, the values on
         # the row, and the value at that y from the column
         xcoords = []
@@ -143,14 +148,26 @@ def verify_low_degree_proof(merkle_root, root_of_unity, proof, maxdeg_plus_1, mo
 
             # The values from the original polynomial
             row = [int.from_bytes(x, 'big') for x in poly_values[i*4: i*4+4]]
+
             rows.append(row)
 
             columnvals.append(int.from_bytes(column_values[i], 'big'))
 
+
+
         # Verify for each selected y coordinate that the four points from the
         # polynomial and the one point from the column that are on that y 
         # coordinate are on the same deg < 4 polynomial
+
         polys = f.multi_interp_4(xcoords, rows)
+
+        print("Polys are::")
+
+        for p in polys:
+            print(p[0])
+            print(p[1])
+            print(p[2])
+            print(p[3])
 
         for p, c in zip(polys, columnvals):
             assert f.eval_quartic(p, special_x) == c

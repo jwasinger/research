@@ -1,3 +1,5 @@
+import binascii
+
 try:
     from hashlib import blake2s
 except:
@@ -23,15 +25,25 @@ def mk_branch(tree, index):
 
 def verify_branch(root, index, proof, output_as_int=False):
     # index = get_index_in_permuted(index, 2**len(proof) // 2)
+    print("pow part is ", str(2**len(proof)))
+    print("idx is ", str(index))
     index += 2**len(proof)
+    print("index is " + str(index))
     v = proof[0]
     for p in proof[1:]:
         if index % 2:
+            print("left")
             v = blake(p + v)
+            print("res is ")
+            print(binascii.hexlify(v))
         else:
+            print("right")
             v = blake(v + p)
+            print("res is ")
+            print(binascii.hexlify(v))
         index //= 2
     assert v == root
+    # import pdb; pdb.set_trace()
     return int.from_bytes(proof[0], 'big') if output_as_int else proof[0]
 
 # Make a compressed proof for multiple indices
@@ -64,7 +76,12 @@ def verify_multi_branch(root, indices, proof):
                 partial_tree[index ^ 1] = b[j]
             index //= 2
     # Verify the branches and output the values
-    return [verify_branch(root, i, b) for i,b in zip(indices, proof)]
+    output = []
+    for i,b in zip(indices, proof):
+        output.append(verify_branch(root, i, b))
+
+    return output
+    # return [verify_branch(root, i, b) for i,b in zip(indices, proof)]
 
 # Byte length of a multi proof
 def bin_length(proof):
